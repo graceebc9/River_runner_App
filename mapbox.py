@@ -6,8 +6,8 @@ import pyproj
 import plotly.graph_objs as go
 import plotly.express as px
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd 
+import numpy as np
 
 from src import find_overlapping_stations, load_stations, get_coords, find_downstream_route, create_CRI, plot_CRI
 

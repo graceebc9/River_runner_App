@@ -7,7 +7,6 @@
 import os 
 import requests
 import json
-import numpy as np
 import pandas as pd 
 import geopandas as gpd
 import shapely as sh
@@ -19,7 +18,7 @@ import urllib.parse
 import plotly.graph_objects as go
 import matplotlib as mpl 
 import plotly.express as px
-
+import numpy as np
 from shapely.geometry import LineString
 
 
