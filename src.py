@@ -94,11 +94,11 @@ def find_overlapping_stations(data, buffer_rad = 0.01 ):
     dict = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
     river_df = pd.DataFrame(dict, index=['geometry']).T
     river_gdf = gpd.GeoDataFrame(river_df , crs='EPSG:4326', geometry=river_df['geometry'] )
-    river_gdf.to_crs('EPSG:4326')
+    river_gdf.to_crs(crs='EPSG:4326')  # BUG: this has probably no effect
 
     #Create buffer geo-df
     buffer_river = river_gdf.buffer(buffer_rad)
-    buffer_river.to_crs('EPSG:4326')
+    buffer_river.to_crs(crs='EPSG:4326')  # BUG: this has probably no effect
     buffer_gdf = gpd.GeoDataFrame(buffer_river , crs='EPSG:4326', geometry=buffer_river )
 
     #Find overalapping stations

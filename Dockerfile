@@ -32,8 +32,8 @@ COPY . .
 CMD ["streamlit", "run", "mapbox.py"]
 
 # Some docker commands see below:
-# docker build --progress=plain --tag streamlit:latest .
-# docker run -ti -p 8501:8501 --rm streamlit:latest /bin/bash
-# docker run -ti -p 8501:8501 --rm streamlit:latest
-# docker run -ti -p 8501:8501 -v ${pwd}:/app --rm streamlit:latest
-# docker run -ti -p 8501:8501 -v ${pwd}:/app --rm streamlit:latest /bin/bash
+# docker build --progress=plain --tag riverapp:latest .
+# docker run -ti -p 8501:8501 --rm riverapp:latest /bin/bash
+# docker run -ti -p 8501:8501 --rm riverapp:latest
+# docker run -ti -p 8501:8501 -v ${pwd}:/app --rm riverapp:latest
+# docker run -ti -p 8501:8501 -v ${pwd}:/app --rm riverapp:latest /bin/bash
