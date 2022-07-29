@@ -4,25 +4,17 @@
 # SRC File for River Runner 
 
 # In[1]:
-import os 
-import requests
-import json
-import random
-import pandas as pd 
-import geopandas as gpd
-import shapely as sh
-from shapely.geometry import LineString
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
-import requests
+import os
 import urllib.parse
-import plotly.graph_objects as go
-import matplotlib as mpl 
-import plotly.express as px
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import requests
 from shapely.geometry import LineString
-
-
+import shapely as sh
+import random
 
 
 
