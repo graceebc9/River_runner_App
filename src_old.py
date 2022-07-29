@@ -1,41 +1,27 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# SRC File for River Runner 
+# SRC File for River Runner
 
-# In[1]:
-import os 
-import requests
-import json
-import random
-import pandas as pd 
-import geopandas as gpd
-import shapely as sh
-from shapely.geometry import LineString
-import matplotlib.patches as mpatches
-import matplotlib.pyplot as plt
-import requests
+import os
 import urllib.parse
-import plotly.graph_objects as go
-import matplotlib as mpl 
-import plotly.express as px
+
+import geopandas as gpd
+import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import requests
 from shapely.geometry import LineString
-
-
-
 
 
 def get_json(url):
     response = requests.get(url)
     return  response.json()
-       
+
+
 def plot_line(ax, ob):
     x, y = ob.xy
     ax.plot(x, y, color='b', alpha=0.7, linewidth=1, solid_capstyle='round', zorder=2)
-
-
-# In[ ]:
 
 
 def take_input_coords(coords):
@@ -45,8 +31,8 @@ def take_input_coords(coords):
             try:
                 # x  = input('Enter your coordinates: ')
                 # coords = [float(a) for a in x.split(",")]
-                x,y = float(coords[0]), float(coords[1])    
-                assert len(coords) == 2 
+                x,y = float(coords[0]), float(coords[1])
+                assert len(coords) == 2
             except AssertionError:
                 print("Please enter two coordinates: latitude and longitude")
                 continue
@@ -62,41 +48,35 @@ def take_input_coords(coords):
     return coords
 
 
-# In[ ]:
-
-
 def find_downstream_route(coords):
-    """ Retrun the json of the flowlines for the downstream route 
+    """ Retrun the json of the flowlines for the downstream route
     """
     coords = take_input_coords(coords)
-    
+
     url = 'https://labs.waterdata.usgs.gov/api/nldi/linked-data/hydrolocation?coords=POINT%28{}%20{}%29'.format(coords[0], coords[1])
     djson = get_json(url)
     navurl = djson['features'][0]['properties']['navigation']
 
     navjson = get_json(navurl)
 
-    ds_main = navjson['downstreamMain']    
+    ds_main = navjson['downstreamMain']
     downstream_main = get_json(ds_main)
     ds_flow = downstream_main[0]['features']
-    
+
     with_distance = ds_flow + '?distance=5500'
     flowlines = get_json(with_distance)
     print('Num of features = {}'.format( len(flowlines['features'])) )
-    
+
     return flowlines
 
 
-# In[ ]:
-
-
 def print_downstream():
-    """ Print map of downstream route 
+    """ Print map of downstream route
     """
-    
+
     flowlines = find_downstream_route()
-    
-    fig, ax = plt.subplots() 
+
+    fig, ax = plt.subplots()
 
     for x in flowlines['features']:
         coords = x['geometry']['coordinates']
@@ -107,36 +87,30 @@ def plot_line(ax, ob):
     x, y = ob.xy
     ax.plot(x, y, color='b', alpha=0.7, linewidth=1, solid_capstyle='round', zorder=2)
 
+
 def find_overlapping_stations(data, buffer_rad = 0.01 ):
     #Extract coords and convert into geo-df
     coords = [data['features'][i]['geometry']['coordinates'] for i in range(len(data['features'])) ]
     dict = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
     river_df = pd.DataFrame(dict, index=['geometry']).T
     river_gdf = gpd.GeoDataFrame(river_df , crs='EPSG:4326', geometry=river_df['geometry'] )
-    river_gdf.to_crs('EPSG:4326')
-    
+    river_gdf.to_crs(crs='EPSG:4326')  # BUG: this has probably no effect
+
     #Create buffer geo-df
     buffer_river = river_gdf.buffer(buffer_rad)
-    buffer_river.to_crs('EPSG:4326')
-    buffer_gdf = gpd.GeoDataFrame(buffer_river , crs='EPSG:4326', geometry=buffer_river ) 
-    
+    buffer_river.to_crs(crs='EPSG:4326')  # BUG: this has probably no effect
+    buffer_gdf = gpd.GeoDataFrame(buffer_river , crs='EPSG:4326', geometry=buffer_river )
+
     #Find overalapping stations
     locations = create_filtered_locations()
-    loc_gdf = gpd.GeoDataFrame(locations , crs='EPSG:4326', geometry=locations['geometry'] )  
+    loc_gdf = gpd.GeoDataFrame(locations , crs='EPSG:4326', geometry=locations['geometry'] )
     overlap_station =  buffer_gdf.sjoin(loc_gdf, how='inner')[[ 'Latitude', 'Longitude', 'pH', 'dDICdTA' ]]
-    overlap_station = overlap_station.drop_duplicates().dropna()
+    overlap_station = overlap_station.drop_duplicates()
     overlap_station  = overlap_station.reset_index()
     overlap_station = overlap_station
     overlap_station.pH = overlap_station.pH.round(3)
     overlap_station['index'] = [ i+1 for i in range(len(overlap_station)) ]
-    return overlap_station
-
-def find_searoute(): 
-  address  = input('Enter your address: ')
-  coords = get_coords(address)
-  return  find_downstream_route(coords)
-
-
+    return overlap_station.dropna()
 
 
 def create_CRI(overlap_station):
@@ -151,6 +125,7 @@ def create_CRI(overlap_station):
     chart = pd.concat([CRI, field, ocean], axis =0 )
     return chart.sort_values('index') , ocean_index
 
+
 def plot_CRI(CRI, ocean_indx):
     fig,ax = plt.subplots()
     ax.plot( CRI['index'], CRI['dDICdTA'])
@@ -163,23 +138,23 @@ def plot_CRI(CRI, ocean_indx):
     # ax.set_suptitle('Index 0 = Field. Final Index = Ocean')
     ax.set_xlabel('Station Index (Field = 0. Ocean = {})'.format(ocean_indx) )
     ax.set_ylabel('CRI')
-    #add ocean CRI line 
+    #add ocean CRI line
     x = np.linspace(0, ocean_indx+.2)
     y = [0.85 for i in range(len(x))]
     ax.text(0, 0.855, 'Ocean CRI')
     ax.plot(x,y , color = 'r', linestyle = 'dashed')
 
     ax.grid('on')
-    
-    return fig,ax 
+
+    return fig,ax
 
 
 def load_stations():
-    path =  os.path.join(os.path.dirname(__file__),"data/sampling_locations.csv") 
+    path =  os.path.join(os.path.dirname(__file__),"data/sampling_locations.csv")
     loc = pd.read_csv(path)
     usloc = loc[loc['Country']=='USA']
     return gpd.GeoDataFrame(usloc, geometry=gpd.points_from_xy(usloc['Longitude'], usloc['Latitude']), crs='EPSG:4326')
-    
+
 
 
 def load_chem( locations):
@@ -194,79 +169,38 @@ def load_chem( locations):
 
     return chem[['Y','Q','STAT_ID','RESULT_DATETIME', 'TA', 'T', 'pCO2', 'pH', 'dDICdTA']]
 
-     
+
 def create_filtered_locations():
+    locations = load_stations()
+    chem = load_chem( locations)
 
-  locations = load_stations()
-  chem = load_chem( locations)
+    pH = chem[['STAT_ID','pH']].groupby(['STAT_ID']).mean()
+    CRI = chem[['STAT_ID','dDICdTA']].groupby(['STAT_ID']).mean()
+    locations = locations.set_index('STAT_ID')
+    station_pH = locations.merge(pH, left_index=True, right_index=True)
+    stat_ph_CRI = station_pH.merge(CRI, left_index=True, right_index=True)
 
-  pH = chem[['STAT_ID','pH']].groupby(['STAT_ID']).mean()
-  CRI = chem[['STAT_ID','dDICdTA']].groupby(['STAT_ID']).mean()
-  locations = locations.set_index('STAT_ID')
-  station_pH = locations.merge(pH, left_index=True, right_index=True)
-  stat_ph_CRI = station_pH.merge(CRI, left_index=True, right_index=True)
+    # 1. stations with very few data points
+    station_qa1 = chem[chem['dDICdTA']>0].groupby(['STAT_ID']).count()
+    qa1 = station_qa1[station_qa1['dDICdTA']<5].index.tolist()
+    chem = chem[~chem['STAT_ID'].isin(qa1)]
 
-  # 1. stations with very few data points
-  station_qa1 = chem[chem['dDICdTA']>0].groupby(['STAT_ID']).count()
-  qa1 = station_qa1[station_qa1['dDICdTA']<5].index.tolist()
-  chem = chem[~chem['STAT_ID'].isin(qa1)]
+    # 2. years with only one station
+    station_qa2 = chem[chem['dDICdTA']>0].groupby(['Y','Q']).count()
+    qa2 = station_qa2[station_qa2['dDICdTA']==1].index.tolist()
+    for Y, Q in qa2:
+        chem = chem[~((chem['Y']==Y) & (chem['Q']==Q))]
 
-  # 2. years with only one station 
-  station_qa2 = chem[chem['dDICdTA']>0].groupby(['Y','Q']).count()
-  qa2 = station_qa2[station_qa2['dDICdTA']==1].index.tolist()
-  for Y, Q in qa2:
-      chem = chem[~((chem['Y']==Y) & (chem['Q']==Q))]
+    # stations with only one year
+    station_qa3 = chem[chem['dDICdTA']>0].groupby(['Y','Q','STAT_ID']).count()
+    station_qa3 = station_qa3.groupby(['STAT_ID']).count()
+    qa3 = station_qa3[station_qa3['dDICdTA']==1].index.tolist()
+    chem = chem[~chem['STAT_ID'].isin(qa3)]
 
-  # stations with only one year 
-  station_qa3 = chem[chem['dDICdTA']>0].groupby(['Y','Q','STAT_ID']).count()
-  station_qa3 = station_qa3.groupby(['STAT_ID']).count()
-  qa3 = station_qa3[station_qa3['dDICdTA']==1].index.tolist()
-  chem = chem[~chem['STAT_ID'].isin(qa3)]
-
-  return stat_ph_CRI[stat_ph_CRI.index.isin(chem['STAT_ID'])]
-
+    return stat_ph_CRI[stat_ph_CRI.index.isin(chem['STAT_ID'])]
 
 
 def get_coords(address):
-  url = 'https://nominatim.openstreetmap.org/search/' + urllib.parse.quote(address) +'?format=json'
-  response = requests.get(url).json()
-  return ( float(response[0]["lon"]), float(response[0]["lat"]))
-
-
-def find_oean_point(data):
-    coords = [data['features'][i]['geometry']['coordinates'] for i in range(len(data['features'])) ]
-    dict = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
-    river_df = pd.DataFrame(dict, index=['geometry']).T
-    river_gdf = gpd.GeoDataFrame(river_df , crs='EPSG:4326', geometry=river_df['geometry'] )
-    river_gdf.to_crs('EPSG:4326')
-    line = river_gdf.iloc[-1]['geometry']
-    f,l = line.boundary.geoms
-    return l.xy
-
-def random_point_mis_basin():
-    minx, miny, maxx, maxy = -113.938141, 37.5, -77.83937, 49.73911
-    x = random.uniform(minx, maxx)
-    y = random.uniform(miny, maxy)
-    return sh.geometry.Point(x,y)
-
-def generate_field_point():
-    """Generates random point in Missipi basin, filters using shapefile 
-    """
-    while True:
-        point= random_point_mis_basin()
-        p_df = gpd.GeoDataFrame(geometry=gpd.GeoSeries( point) ).set_crs( crs = 'EPSG:4326')
-        p_df =  p_df.to_crs( crs = 'EPSG:4326')
-
-        basin_sh =  os.path.join(os.path.dirname(__file__),'data/Miss_RiverBasin/Miss_RiverBasin.shp')
-        basin = gpd.read_file(basin_sh)
-        basin =  basin.to_crs('EPSG:4326')
-        buff_basin = basin.buffer(-1)
-        buff_basin.to_crs('EPSG:4326')
-        buffer_gdf = gpd.GeoDataFrame(buff_basin , crs='EPSG:4326', geometry=buff_basin ) 
-
-
-        overlap = buffer_gdf.sjoin(p_df)
-        if len(overlap) != 0:
-            break
-        
-    return point.x,  point.y
+    url = 'https://nominatim.openstreetmap.org/search/' + urllib.parse.quote(address) +'?format=json'
+    response = requests.get(url).json()
+    return ( float(response[0]["lon"]), float(response[0]["lat"]))
