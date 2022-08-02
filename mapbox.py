@@ -1,10 +1,15 @@
 
-
-import matplotlib.pyplot as plt
-import plotly.graph_objs as go
 import streamlit as st
+import json
+import geopandas as gpd
+import pyproj
+import plotly.graph_objs as go
+import plotly.express as px
+import matplotlib.pyplot as plt
+import pandas as pd 
+import numpy as np
 
-from src import find_overlapping_stations, load_stations, generate_field_point,  get_coords, find_downstream_route, create_CRI, plot_CRI, find_oean_point
+from src import find_overlapping_stations, load_stations, generate_field_point,  get_coords, find_downstream_route, create_CRI, plot_CRI, find_oean_point, create_multi_CRI
 
 buffer = 0.009
 
@@ -15,8 +20,9 @@ st.title('Eion Carbon Removal Verification')
 def find_map(coords):
     json_flow = find_downstream_route(coords)
     overlap_station = find_overlapping_stations( json_flow, buffer_rad =buffer)
-    CRI , ocean_index =create_CRI(overlap_station)
-    fig_cri , ax_cri  =  plot_CRI(CRI , ocean_index)
+    # CRI , ocean_index =create_CRI(overlap_station)
+    # fig_cri , ax_cri  =  plot_CRI(CRI , ocean_index)
+    fig_cri_multi, num_drops = create_multi_CRI(json_flow, )
     #coords for X on map and ocean point
     cross_lon, cross_lat = coords[0], coords[1]
 
@@ -75,7 +81,7 @@ def find_map(coords):
         }]
     )
     )
-    return fig, fig_cri
+    return fig, fig_cri_multi, num_drops
 
 
 
@@ -114,14 +120,17 @@ while True:
     if go_b:
         coords = get_coords(address)
         print(coords)
-        fig, fig_cri  = find_map(coords)
+        fig, fig_cri, num_drops  = find_map(coords)
         
         # fig_line, ax_line = plt.subplots()
         # ax_line.plot( CRI['index'], CRI['dDICdTA'])
         
         # display streamlit map
         st.plotly_chart(fig)
-        st.pyplot(fig_cri)
+        with st.container():
+
+            st.markdown('### DIC trapped in water from this point risks escape to the atmosphere *{}* times.'.format(num_drops))
+            st.pyplot(fig_cri)
         st.session_state.num += 2
         
         break
@@ -144,96 +153,3 @@ while True:
 
 
     
-
-
-# if st.button('Choose random point', key=num):
-#         coords = generate_field_point()
-#         fig, fig_cri , CRI , o_i= find_map(coords)
-        
-#         fig_line, ax_line = plt.subplots()
-#         ax_line.plot( CRI['index'], CRI['dDICdTA'])
-        
-#         # display streamlit map
-#         st.plotly_chart(fig)
-#         st.pyplot(fig_cri)
-#         st.session_state.num += 2
-        
-#         break
-#     else:        
-#         st.stop()
-
-# while True:
-#     num = st.session_state.num
-#     if st.button('Go', key=num): 
-        
-#         coords = get_coords(address)
-#         json_flow = find_downstream_route(coords)
-#         overlap_station = find_overlapping_stations( json_flow, buffer_rad =buffer)
-#         CRI , ocean_index =create_CRI(overlap_station)
-#         fig_cri , ax_cri  =  plot_CRI(CRI , ocean_index)
-#         #coords for X on map and ocean point
-#         cross_lon, cross_lat = coords[0], coords[1]
-
-#         o_coords = find_oean_point(json_flow)
-#         o_lon, o_lat = o_coords[0][0], o_coords[1][0]
-
-#         fig, fig_cri = create_map(overlap_station,cross_lat, o_lat, cross_lon, o_lon)
-#         fig_line, ax_line = plt.subplots()
-#         ax_line.plot( CRI['index'], CRI['dDICdTA'])
-#         # display streamlit map
-#         st.plotly_chart(fig)
-#         st.pyplot(fig_cri)
-#         st.session_state.num += 1
-#         break
-
-
-    # if st.button('Choose Random Point', key='random'):  
-    # # address=AddresForm(
-    #     num = st.session_state.num
-    #     coords = generate_field_point()
-
-    #     # coords =  main()
-    #     json_flow = find_downstream_route(coords)
-    #     overlap_station = find_overlapping_stations( json_flow, buffer_rad =buffer)
-    #     CRI , ocean_index =create_CRI(overlap_station)
-    #     fig_cri , ax_cri  =  plot_CRI(CRI , ocean_index)
-    #     #coords for X on map and ocean point
-    #     cross_lon, cross_lat = coords[0], coords[1]
-
-    #     o_coords = find_oean_point(json_flow)
-    #     o_lon, o_lat = o_coords[0][0], o_coords[1][0]
-
-    #     fig, fig_cri = create_map(overlap_station,cross_lat, o_lat, cross_lon, o_lon)
-        
-    #     fig_line, ax_line = plt.subplots()
-    #     ax_line.plot( CRI['index'], CRI['dDICdTA'])
-    #     # display streamlit map
-    #     st.plotly_chart(fig)
-    #     st.pyplot(fig_cri)
-    #     st.session_state.num += 1
-
-
-
-
-
-
-
-
-    
-
-
-#### Ask for address, generate lat/lon and find river and stations
-
-  
-
-# if st.button('Take me to a random point'):
-#     address = st.text_input("Address", 'Random Point')
-#     coords = generate_field_point()
-     
-
-# else:
-#     None
-
-
-
-# st.line_chart(chart_data)

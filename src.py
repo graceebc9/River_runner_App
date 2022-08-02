@@ -4,6 +4,7 @@
 # SRC File for River Runner 
 
 # In[1]:
+
 import os
 import urllib.parse
 
@@ -15,17 +16,21 @@ import requests
 from shapely.geometry import LineString
 import shapely as sh
 import random
-
+from matplotlib.pyplot import cm
+import pyproj
 
 
 def get_json(url):
     response = requests.get(url)
     return  response.json()
        
-def plot_line(ax, ob):
+def plot_line_col(ax, ob, c):
+    x, y = ob.xy
+    ax.plot(x, y, color=c, alpha=0.7, linewidth=1, solid_capstyle='round', zorder=2)
+
+def plot_line(ax, ob, ):
     x, y = ob.xy
     ax.plot(x, y, color='b', alpha=0.7, linewidth=1, solid_capstyle='round', zorder=2)
-
 
 # In[ ]:
 
@@ -102,8 +107,8 @@ def plot_line(ax, ob):
 def find_overlapping_stations(data, buffer_rad = 0.01 ):
     #Extract coords and convert into geo-df
     coords = [data['features'][i]['geometry']['coordinates'] for i in range(len(data['features'])) ]
-    dict = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
-    river_df = pd.DataFrame(dict, index=['geometry']).T
+    dict_data = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
+    river_df = pd.DataFrame(dict_data, index=['geometry']).T
     river_gdf = gpd.GeoDataFrame(river_df , crs='EPSG:4326', geometry=river_df['geometry'] )
     river_gdf.to_crs('EPSG:4326')
     
@@ -227,8 +232,8 @@ def get_coords(address):
 
 def find_oean_point(data):
     coords = [data['features'][i]['geometry']['coordinates'] for i in range(len(data['features'])) ]
-    dict = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
-    river_df = pd.DataFrame(dict, index=['geometry']).T
+    dict_data = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
+    river_df = pd.DataFrame(dict_data, index=['geometry']).T
     river_gdf = gpd.GeoDataFrame(river_df , crs='EPSG:4326', geometry=river_df['geometry'] )
     river_gdf.to_crs('EPSG:4326')
     line = river_gdf.iloc[-1]['geometry']
@@ -262,3 +267,126 @@ def generate_field_point():
             break
         
     return point.x,  point.y
+
+
+
+def get_river_df_utm(data):
+    utm = pyproj.CRS('EPSG:26907')
+    coords = [data['features'][i]['geometry']['coordinates'] for i in range(len(data['features'])) ]
+    dict_data = {key: value for (key, value) in zip([i for i in range(len(data['features'])) ] , [LineString(coords[i]) for i in range(len(data['features'])) ] ) }
+    river_df = pd.DataFrame(dict_data, index=['geometry']).T
+    river_gdf = gpd.GeoDataFrame(river_df , crs='EPSG:4326', geometry=river_df['geometry'] )
+    return river_gdf.to_crs(utm)
+
+def snap_points(data,  offset = 1000):
+    """Generate the snapped points to the river for stations, uses https://medium.com/@brendan_ward/how-to-leverage-geopandas-for-faster-snapping-of-points-to-lines-6113c94e59aa
+    """
+
+    utm = pyproj.CRS('EPSG:26907')
+
+    lines = get_river_df_utm(data)
+
+    locations = create_filtered_locations()
+    locations = locations.to_crs(utm)
+    points = gpd.GeoDataFrame(locations , crs=utm, geometry=locations['geometry'] )  
+    print(points.crs, lines.crs)
+
+    bbox = points.geometry.bounds + [-offset, -offset, offset, offset]
+    hits = bbox.apply(lambda row: [x for x in lines.sindex.intersection(row)], axis=1)
+    tmp = pd.DataFrame({ "pt_idx": np.repeat(hits.index, hits.apply(len)),   "line_i": np.concatenate(hits.values)})
+    
+    lines.reset_index(drop=True)
+    lines['line_i'] =[int(x) for x in lines.index]
+    
+    # Join back to the lines on line_i; we use reset_index() to 
+    # give us the ordinal position of each line
+    tmp = tmp.join(lines, on='line_i', lsuffix='_left', rsuffix='_right')
+                        
+        
+    # Join back to the original points to get their geometry
+    # rename the point geometry as "point"
+    tmp = tmp.join(points.geometry.rename("point"), on="pt_idx" )
+    
+    # Convert back to a GeoDataFrame, so we can do spatial ops
+    tmp = gpd.GeoDataFrame(tmp, geometry="geometry", crs=points.crs)
+    tmp["snap_dist"] = tmp.geometry.distance(gpd.GeoSeries(tmp.point))
+    tolerance = offset
+    
+    # Discard any lines that are greater than tolerance from points
+    tmp = tmp.loc[tmp.snap_dist <= tolerance]
+    # Sort on ascending snap distance, so that closest goes to top
+    tmp = tmp.sort_values(by=["snap_dist"])
+
+    
+     # group by the index of the points and take the first, which is the
+    # closest line 
+    closest = tmp.groupby("pt_idx").first()
+    # construct a GeoDataFrame of the closest lines
+    closest = gpd.GeoDataFrame(closest, geometry="geometry")
+    closest['STAT_ID'] = [int(x) for x in closest.index ]
+    
+    
+    # Position of nearest point from start of the line
+    pos = closest.geometry.project(gpd.GeoSeries(closest.point))
+    # Get new point location geometry
+    new_pts = closest.geometry.interpolate(pos)
+
+    #Identify the columns we want to copy from the closest line to the point, such as a line ID.
+    line_columns = ['STAT_ID', 'line_i_right']
+    # Create a new GeoDataFrame from the columns from the closest line and new point geometries (which will be called "geometries")
+    snapped = gpd.GeoDataFrame( closest[line_columns],geometry=new_pts, crs=utm)
+
+    # Join back to the original points: on index which is station id
+    print(points.crs )
+    print(snapped.crs )
+    updated_points = points.drop(columns=["geometry"]).join(snapped)
+    updated_points= gpd.GeoDataFrame( updated_points, geometry =updated_points['geometry'], crs=utm)
+    # updated_points = updated_points.set_crs(utm)
+    # You may want to drop any that didn't snap, if so:
+    updated_points = updated_points.dropna(subset=['pH', 'dDICdTA', "geometry"])
+    updated_points= updated_points.to_crs('EPSG:4326')
+    return updated_points
+
+def find_CRI_years():
+    locations = load_stations()
+    valid_ids = locations.index.unique().tolist()
+    chem=load_chem(locations)
+    q_CRI = chem[['STAT_ID','Y', 'dDICdTA']].groupby(['STAT_ID',  'Y']).mean().dropna()
+    return q_CRI.reset_index(level=[1])
+
+
+def create_multi_CRI(data):
+    loc= snap_points(data)
+    loc['index_plot']= [i +1 for i in range(len(loc))]
+    
+    q_CRI = find_CRI_years()
+    join = loc.join(q_CRI, lsuffix='l')
+    
+    year = join.groupby('Y').count()
+    populated = year[year['pH'] >3].index.tolist()
+    
+    fig, ax = plt.subplots(figsize=(7,5) )
+    ax.set_title('Carbon Retention Index (CRI) by Station',
+        fontsize='medium',
+        loc='center',
+        # fontweight='normal',
+        style='normal',
+        family='monospace')
+    # ax.set_suptitle('Index 0 = Field. Final Index = Ocean')
+    
+    ocean_indx= len(loc)+1
+    ax.set_xlabel('Station Index (Field = 0. Ocean = {})'.format(ocean_indx) )
+    ax.set_ylabel('CRI')
+    num_drops=0
+    for y in populated:
+        data= join[join.Y == y]
+        a,*b =  data.index_plot.values.tolist()
+        c,*d =  data.dDICdTA.values.tolist()
+        ax.plot([0,a,*b, ocean_indx], [1, c, *d, 0.85], label=y, alpha=0.5)
+        min = data.dDICdTA.values.min()
+        if min < 0.85:
+            num_drops+=1 
+ 
+    leg = ax.legend(bbox_to_anchor=(1.05, 1.05))
+    
+    return fig , num_drops

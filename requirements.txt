@@ -7,3 +7,4 @@ geopandas
 rtree
 requests
 streamlit
+fiona
