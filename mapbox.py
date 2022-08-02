@@ -138,14 +138,16 @@ while True:
     elif rand_b:
         coords = generate_field_point()
         print(coords)
-        fig, fig_cri  = find_map(coords)
+        fig, fig_cri, num_crops  = find_map(coords)
         
         # fig_line, ax_line = plt.subplots()
         # ax_line.plot( CRI['index'], CRI['dDICdTA'])
         
         # display streamlit map
         st.plotly_chart(fig)
-        st.pyplot(fig_cri)
+        with st.container():
+            st.markdown('### DIC trapped in water from this point risks escape to the atmosphere *{}* times.'.format(num_drops))
+            st.pyplot(fig_cri)
         st.session_state.num += 2
         
         break
