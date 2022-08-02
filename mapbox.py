@@ -137,8 +137,8 @@ while True:
         break
     elif rand_b:
         coords = generate_field_point()
-        print(coords)
-        fig, fig_cri, num_crops  = find_map(coords)
+
+        fig, fig_cri, num_drops  = find_map(coords)
         
         # fig_line, ax_line = plt.subplots()
         # ax_line.plot( CRI['index'], CRI['dDICdTA'])
