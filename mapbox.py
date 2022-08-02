@@ -129,9 +129,10 @@ while True:
         # display streamlit map
         st.plotly_chart(fig)
         with st.container():
-
+            st.markdown('----')
             st.markdown('### DIC trapped in water from this point risks escape to the atmosphere *{}* times.'.format(num_drops))
             st.pyplot(fig_cri)
+            st.markdown('----')
         st.session_state.num += 2
         
         break
@@ -146,8 +147,10 @@ while True:
         # display streamlit map
         st.plotly_chart(fig)
         with st.container():
+            st.markdown('----')
             st.markdown('### DIC trapped in water from this point risks escape to the atmosphere *{}* times.'.format(num_drops))
             st.pyplot(fig_cri)
+            st.markdown('----')
         st.session_state.num += 2
         
         break
